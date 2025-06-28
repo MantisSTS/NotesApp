@@ -125,16 +125,16 @@
                             <div class="flex items-center space-x-3">
                                 <i class="fas fa-file text-gray-500"></i>
                                 <div>
-                                    <span class="font-medium text-gray-800">{{ attachment.filename }}</span>
-                                    <span class="text-sm text-gray-500 ml-2">({{ attachment.filesize | filesizeformat }})</span>
-                                    {% if attachment.encrypted %}
+                                    <span class="font-medium text-gray-800">{{ attachment[1] | e }}</span>
+                                    <span class="text-sm text-gray-500 ml-2">({{ attachment[3] | filesizeformat }})</span>
+                                    {% if attachment[5] %}
                                         <span class="text-red-600 text-xs ml-2">
                                             <i class="fas fa-lock"></i> Encrypted
                                         </span>
                                     {% endif %}
                                 </div>
                             </div>
-                            <a href="{{ url_for('download_attachment', attachment_id=attachment.id) }}" 
+                            <a href="{{ url_for('download_attachment', attachment_id=attachment[0]) }}" 
                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium transition duration-200">
                                 <i class="fas fa-download mr-1"></i>Download
                             </a>

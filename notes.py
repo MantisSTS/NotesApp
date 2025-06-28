@@ -1651,7 +1651,7 @@ def create_web_app(notes_app: NotesApp) -> Flask:
             return redirect(url_for('download_attachment', attachment_id=attachment_id))
         
         if request.method == 'POST':
-            password = request.form.get('password', '').strip()
+            password = sanitize_input(request.form.get('password', ''), max_length=500)
             if password:
                 # Redirect to download with password parameter
                 return redirect(url_for('download_attachment', attachment_id=attachment_id, password=password))
