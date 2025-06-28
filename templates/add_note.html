@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Add Note - Notes App{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-md p-6">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">
+        <i class="fas fa-plus-circle mr-2 text-blue-600"></i>Add New Note
+    </h2>
+
+    <form method="POST" enctype="multipart/form-data" class="space-y-6">
+        <!-- Tags Section -->
+        <div>
+            <label for="tags" class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-tags mr-1"></i>Tags
+            </label>
+            <input 
+                type="text" 
+                id="tags" 
+                name="tags" 
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                placeholder="e.g., client, project-name, urgent (comma-separated)"
+            >
+            <p class="mt-1 text-sm text-gray-500">
+                Enter tags separated by commas. Tags help categorize and find your notes more easily.
+            </p>
+            {% if all_tags %}
+                <div class="mt-2">
+                    <span class="text-xs text-gray-600">Existing tags: </span>
+                    {% for tag in all_tags %}
+                        <button 
+                            type="button" 
+                            class="tag-suggestion inline-block bg-gray-100 hover:bg-blue-100 text-gray-700 px-2 py-1 rounded-md text-xs mr-1 mb-1 transition duration-200"
+                            onclick="addTag('{{ tag }}')"
+                        >
+                            {{ tag }}
+                        </button>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+
+        <div>
+            <label for="type" class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-tag mr-1"></i>Note Type
+            </label>
+            <div class="relative">
+                <input 
+                    type="text" 
+                    id="type" 
+                    name="type" 
+                    list="existing-types"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                    placeholder="e.g., git, docker, python, linux..."
+                    required
+                >
+                <datalist id="existing-types">
+                    {% for type in types %}
+                        <option value="{{ type | e }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+            <p class="mt-1 text-sm text-gray-500">
+                Choose an existing type or create a new one. Types help organize your notes.
+            </p>
+        </div>
+
+        <div>
+            <label for="cmd" class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-terminal mr-1"></i>Command/Note Content
+            </label>
+            <textarea 
+                id="cmd" 
+                name="cmd" 
+                rows="4"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 font-mono"
+                placeholder="Enter your command, code snippet, or note content here..."
+                required
+            ></textarea>
+            <p class="mt-1 text-sm text-gray-500">
+                Enter the command, code snippet, or any text content you want to save.
+            </p>
+        </div>
+
+        <div>
+            <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-info-circle mr-1"></i>Description (Optional)
+            </label>
+            <textarea 
+                id="description" 
+                name="description" 
+                rows="2"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                placeholder="Briefly describe what this command does..."
+            ></textarea>
+            <p class="mt-1 text-sm text-gray-500">
+                Optional description to explain what the command does or when to use it.
+            </p>
+        </div>
+
+        <div>
+            <label for="output" class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-terminal mr-1"></i>Example Output (Optional)
+            </label>
+            <textarea 
+                id="output" 
+                name="output" 
+                rows="3"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 font-mono text-sm"
+                placeholder="Paste example output here..."
+            ></textarea>
+            <p class="mt-1 text-sm text-gray-500">
+                Optional example output to show what the command produces.
+            </p>
+        </div>
+
+        <div>
+            <div class="flex items-center mb-3">
+                <input 
+                    type="checkbox" 
+                    id="encrypt-toggle" 
+                    class="mr-2 rounded focus:ring-2 focus:ring-blue-500"
+                >
+                <label for="encrypt-toggle" class="text-sm font-medium text-gray-700">
+                    <i class="fas fa-lock mr-1 text-red-600"></i>Encrypt this note's content
+                </label>
+            </div>
+            <div id="encryption-field" class="hidden">
+                <label for="encrypt_password" class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-key mr-1"></i>Encryption Password
+                </label>
+                <input 
+                    type="password" 
+                    id="encrypt_password" 
+                    name="encrypt_password" 
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500 transition duration-200"
+                    placeholder="Enter a strong password..."
+                >
+                <p class="mt-1 text-sm text-red-600">
+                    ⚠️ Warning: If you forget this password, the content cannot be recovered!
+                </p>
+            </div>
+        </div>
+
+        <!-- File Attachments Section -->
+        <div class="border-t pt-4">
+            <h3 class="text-lg font-medium text-gray-700 mb-3">
+                <i class="fas fa-paperclip mr-1"></i>File Attachments
+            </h3>
+            <div>
+                <label for="attachments" class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-upload mr-1"></i>Attach Files
+                </label>
+                <input 
+                    type="file" 
+                    id="attachments" 
+                    name="attachments" 
+                    multiple
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                    accept="*/*"
+                >
+                <p class="mt-1 text-sm text-gray-500">
+                    Select one or more files to attach to this note. Files are stored securely in the database.
+                </p>
+                <div id="attachment-encryption-warning" class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md hidden">
+                    <div class="flex items-center text-yellow-800">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <span class="text-sm font-medium">File Encryption Notice</span>
+                    </div>
+                    <p class="text-yellow-700 text-sm mt-1">
+                        Since this note will be encrypted, any attached files will also be encrypted with the same password. 
+                        You'll need the password to download these files later.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-4">
+            <a href="{{ url_for('index') }}" class="text-gray-600 hover:text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition duration-200">
+                <i class="fas fa-arrow-left mr-1"></i>Back to Notes
+            </a>
+            <button 
+                type="submit" 
+                class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+                <i class="fas fa-save mr-1"></i>Save Note
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Quick Examples -->
+<div class="bg-white rounded-lg shadow-md p-6 mt-8">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+        <i class="fas fa-lightbulb mr-2 text-yellow-500"></i>Example Notes
+    </h3>
+    <div class="grid md:grid-cols-2 gap-4">
+        <div class="bg-gray-50 p-4 rounded-lg">
+            <h4 class="font-medium text-gray-700 mb-2">Git Commands</h4>
+            <div class="text-sm text-gray-600 space-y-1">
+                <div><strong>Type:</strong> git</div>
+                <div><strong>Command:</strong> git log --oneline --graph</div>
+            </div>
+        </div>
+        <div class="bg-gray-50 p-4 rounded-lg">
+            <h4 class="font-medium text-gray-700 mb-2">Docker Commands</h4>
+            <div class="text-sm text-gray-600 space-y-1">
+                <div><strong>Type:</strong> docker</div>
+                <div><strong>Command:</strong> docker run -it --rm ubuntu:latest</div>
+            </div>
+        </div>
+        <div class="bg-gray-50 p-4 rounded-lg">
+            <h4 class="font-medium text-gray-700 mb-2">Python Snippets</h4>
+            <div class="text-sm text-gray-600 space-y-1">
+                <div><strong>Type:</strong> python</div>
+                <div><strong>Command:</strong> python -m http.server 8000</div>
+            </div>
+        </div>
+        <div class="bg-gray-50 p-4 rounded-lg">
+            <h4 class="font-medium text-gray-700 mb-2">Linux Commands</h4>
+            <div class="text-sm text-gray-600 space-y-1">
+                <div><strong>Type:</strong> linux</div>
+                <div><strong>Command:</strong> find . -name "*.py" -type f</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-resize textareas
+    const textareas = document.querySelectorAll('textarea');
+    textareas.forEach(textarea => {
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+        });
+    });
+
+    // Tag management functions
+    function addTag(tagName) {
+        const tagsInput = document.getElementById('tags');
+        const currentTags = tagsInput.value.split(',').map(t => t.trim()).filter(t => t);
+        
+        if (!currentTags.includes(tagName)) {
+            currentTags.push(tagName);
+            tagsInput.value = currentTags.join(', ');
+        }
+    }
+
+    // Focus on type field when page loads
+    document.getElementById('type').focus();
+
+    // Handle encryption toggle
+    const encryptToggle = document.getElementById('encrypt-toggle');
+    const encryptionField = document.getElementById('encryption-field');
+    const encryptPasswordField = document.getElementById('encrypt_password');
+    const attachmentWarning = document.getElementById('attachment-encryption-warning');
+    
+    encryptToggle.addEventListener('change', function() {
+        if (this.checked) {
+            encryptionField.classList.remove('hidden');
+            encryptPasswordField.required = true;
+            encryptPasswordField.focus();
+            attachmentWarning.classList.remove('hidden');
+        } else {
+            encryptionField.classList.add('hidden');
+            encryptPasswordField.required = false;
+            encryptPasswordField.value = '';
+            attachmentWarning.classList.add('hidden');
+        }
+    });
+</script>
+{% endblock %}

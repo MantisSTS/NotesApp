@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Standalone Notes CLI wrapper for Docker
+# This runs commands without needing the web server container running
+
+# Use the persistent volume for data
+docker run --rm \
+    -v notesapp_notes_data:/app/data \
+    -e NOTES_DB_PATH=/app/data/notes.db \
+    notes-app python notes.py "$@"

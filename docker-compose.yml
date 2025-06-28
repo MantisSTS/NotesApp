@@ -1,0 +1,26 @@
+services:
+  notesapp:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: notes-app
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount a volume for persistent database storage
+      - notes_data:/app/data
+    environment:
+      - NOTES_DB_PATH=/app/data/notes.db
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Named volume for persistent database storage
+volumes:
+  notes_data:
+    driver: local

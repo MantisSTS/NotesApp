@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Notes App - Home{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">
+            <i class="fas fa-list mr-2 text-blue-600"></i>All Notes
+        </h2>
+        <div class="flex items-center space-x-4">
+            <label class="flex items-center space-x-2 text-sm text-gray-600">
+                <input type="checkbox" id="showOutputToggle" class="rounded focus:ring-2 focus:ring-blue-500">
+                <span>Show example outputs</span>
+            </label>
+            <span class="text-sm text-gray-500">
+                Total notes: {{ grouped_notes.values() | map('length') | sum }}
+            </span>
+            <a href="{{ url_for('add_note') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200">
+                <i class="fas fa-plus mr-1"></i>Add New Note
+            </a>
+        </div>
+    </div>
+
+    {% if grouped_notes %}
+        {% for note_type, notes in grouped_notes.items() %}
+            <div class="mb-8 last:mb-0">
+                <div class="flex items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">
+                        <i class="fas fa-tag mr-1 text-blue-600"></i>{{ note_type }}
+                        <span class="ml-2 text-sm text-gray-500">({{ notes | length }})</span>
+                    </h3>
+                </div>
+                
+                <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {% for note in notes %}
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                                    ID: {{ note.id }}
+                                </span>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs text-gray-500">
+                                        {{ note.created_at }}
+                                    </span>
+                                    <button 
+                                        class="edit-note-btn text-blue-500 hover:text-blue-700 text-xs p-1 hover:bg-blue-50 rounded transition duration-200"
+                                        onclick="window.location.href='/edit/{{ note.id }}'"
+                                        title="Edit this note"
+                                    >
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button 
+                                        class="delete-note-btn text-red-500 hover:text-red-700 text-xs p-1 hover:bg-red-50 rounded transition duration-200"
+                                        data-note-id="{{ note.id }}"
+                                        data-note-preview="{{ (note.cmd[:30] + '...') | e }}"
+                                        title="Delete this note"
+                                    >
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {% if note.description %}
+                                <div class="mb-2 text-sm text-gray-600 italic">
+                                    <i class="fas fa-info-circle mr-1 text-blue-500"></i>{{ note.description | e }}
+                                </div>
+                            {% endif %}
+                            
+                            {% if note.encrypted %}
+                                <div class="bg-red-50 border border-red-200 p-3 rounded-md mb-2">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center text-red-600">
+                                            <i class="fas fa-lock mr-2"></i>
+                                            <span class="font-medium">Encrypted Content</span>
+                                        </div>
+                                        <button 
+                                            class="decrypt-note-btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs transition duration-200"
+                                            data-note-id="{{ note.id }}"
+                                        >
+                                            <i class="fas fa-unlock mr-1"></i>Decrypt
+                                        </button>
+                                    </div>
+                                    <div class="text-sm text-red-500 mt-1">
+                                        Enter password to view the encrypted command
+                                    </div>
+                                    <div class="decrypted-content-{{ note.id }} hidden mt-3">
+                                        <div class="bg-gray-800 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto">
+                                            <pre class="whitespace-pre-wrap break-words"></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="bg-gray-800 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto mb-2">
+                                    <pre class="whitespace-pre-wrap break-words">{{ note.cmd | e }}</pre>
+                                </div>
+                            {% endif %}
+                            
+                            {% if note.output %}
+                                <div class="output-section hidden bg-gray-100 border border-gray-300 p-3 rounded-md">
+                                    <div class="text-xs text-gray-500 mb-1 font-semibold">Example Output:</div>
+                                    <pre class="text-xs text-gray-700 font-mono whitespace-pre-wrap">{{ note.output | e }}</pre>
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Tags -->
+                            {% if note.tags %}
+                                <div class="flex flex-wrap gap-1 mt-2">
+                                    {% for tag in note.tags %}
+                                        <span class="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                                            <i class="fas fa-tag mr-1"></i>{{ tag }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Attachments -->
+                            {% if note.attachments %}
+                                <div class="mt-2 pt-2 border-t border-gray-200">
+                                    <div class="text-xs text-gray-500 mb-1">
+                                        <i class="fas fa-paperclip mr-1"></i>Attachments ({{ note.attachments | length }}):
+                                    </div>
+                                    <div class="space-y-1">
+                                        {% for attachment in note.attachments %}
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span class="text-gray-700 truncate flex-1">
+                                                    <i class="fas fa-file mr-1"></i>{{ attachment[1] }}
+                                                    {% if attachment[5] %}
+                                                        <i class="fas fa-lock text-red-500 ml-1" title="Encrypted attachment"></i>
+                                                    {% endif %}
+                                                </span>
+                                                <a 
+                                                    href="/attachment/{{ attachment[0] }}" 
+                                                    class="text-blue-600 hover:text-blue-800 ml-2"
+                                                    title="Download {{ attachment[1] }}{% if attachment[5] %} (Encrypted - Password Required){% endif %}"
+                                                >
+                                                    <i class="fas fa-download"></i>
+                                                    {% if attachment[5] %}
+                                                        <i class="fas fa-lock text-xs ml-1"></i>
+                                                    {% endif %}
+                                                </a>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-center py-12">
+            <i class="fas fa-sticky-note text-gray-300 text-6xl mb-4"></i>
+            <h3 class="text-xl font-medium text-gray-500 mb-2">No notes yet</h3>
+            <p class="text-gray-400 mb-6">Start by adding your first note!</p>
+            <a href="{{ url_for('add_note') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md font-medium transition duration-200">
+                <i class="fas fa-plus mr-2"></i>Add Your First Note
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Quick Stats -->
+{% if grouped_notes %}
+<div class="bg-white rounded-lg shadow-md p-6">
+    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+        <i class="fas fa-chart-bar mr-2 text-blue-600"></i>Quick Stats
+    </h3>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="text-center">
+            <div class="text-2xl font-bold text-blue-600">{{ grouped_notes | length }}</div>
+            <div class="text-sm text-gray-500">Types</div>
+        </div>
+        <div class="text-center">
+            <div class="text-2xl font-bold text-green-600">{{ grouped_notes.values() | map('length') | sum }}</div>
+            <div class="text-sm text-gray-500">Total Notes</div>
+        </div>
+        <div class="text-center">
+            <div class="text-2xl font-bold text-purple-600">
+                {{ (grouped_notes.values() | map('length') | sum / grouped_notes | length) | round(1) if grouped_notes else 0 }}
+            </div>
+            <div class="text-sm text-gray-500">Avg per Type</div>
+        </div>
+        <div class="text-center">
+            <div class="text-2xl font-bold text-orange-600">
+                {{ grouped_notes.values() | map('length') | max if grouped_notes else 0 }}
+            </div>
+            <div class="text-sm text-gray-500">Max in Type</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Handle show/hide output toggle
+    const outputToggle = document.getElementById('showOutputToggle');
+    const outputSections = document.querySelectorAll('.output-section');
+    
+    outputToggle.addEventListener('change', function() {
+        outputSections.forEach(section => {
+            if (this.checked) {
+                section.classList.remove('hidden');
+            } else {
+                section.classList.add('hidden');
+            }
+        });
+    });
+    
+    // Delete note function - updated to use event delegation
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.delete-note-btn')) {
+            const button = e.target.closest('.delete-note-btn');
+            const noteId = button.getAttribute('data-note-id');
+            const notePreview = button.getAttribute('data-note-preview');
+            
+            if (confirm(`Are you sure you want to delete this note?\n\n"${notePreview}"`)) {
+                // Create and submit a form to delete the note
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/delete/${noteId}`;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+        
+        // Handle decrypt note button
+        if (e.target.closest('.decrypt-note-btn')) {
+            const button = e.target.closest('.decrypt-note-btn');
+            const noteId = button.getAttribute('data-note-id');
+            
+            // Create password modal
+            showPasswordModal(noteId, button);
+        }
+    });
+
+    // Password modal functionality
+    function showPasswordModal(noteId, button) {
+        // Create modal HTML
+        const modalHtml = `
+            <div id="password-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                    <div class="mt-3">
+                        <div class="flex items-center mb-4">
+                            <i class="fas fa-lock text-red-600 text-xl mr-2"></i>
+                            <h3 class="text-lg font-medium text-gray-900">Enter Password</h3>
+                        </div>
+                        <div class="mt-2 px-7 py-3">
+                            <p class="text-sm text-gray-500 mb-4">
+                                Enter the password to decrypt this note:
+                            </p>
+                            <input 
+                                type="password" 
+                                id="modal-password" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                placeholder="Password..."
+                                autofocus
+                            >
+                        </div>
+                        <div class="flex items-center px-4 py-3 space-x-3 justify-end">
+                            <button 
+                                id="modal-cancel" 
+                                class="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                id="modal-decrypt" 
+                                class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                            >
+                                <i class="fas fa-unlock mr-1"></i>Decrypt
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        const modal = document.getElementById('password-modal');
+        const passwordInput = document.getElementById('modal-password');
+        const cancelBtn = document.getElementById('modal-cancel');
+        const decryptBtn = document.getElementById('modal-decrypt');
+        
+        // Focus on password input
+        passwordInput.focus();
+        
+        // Handle cancel
+        function closeModal() {
+            modal.remove();
+        }
+        
+        cancelBtn.addEventListener('click', closeModal);
+        
+        // Handle escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+        
+        // Handle decrypt
+        function performDecrypt() {
+            const password = passwordInput.value.trim();
+            if (!password) {
+                passwordInput.focus();
+                return;
+            }
+            
+            // Show loading state
+            decryptBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Decrypting...';
+            decryptBtn.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Decrypting...';
+            button.disabled = true;
+            
+            // Send decrypt request
+            fetch(`/decrypt/${noteId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({password: password})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show decrypted content
+                    const contentDiv = document.querySelector(`.decrypted-content-${noteId}`);
+                    const preElement = contentDiv.querySelector('pre');
+                    preElement.textContent = data.content;
+                    contentDiv.classList.remove('hidden');
+                    
+                    // Hide the decrypt button
+                    button.style.display = 'none';
+                    
+                    // Close modal
+                    closeModal();
+                } else {
+                    alert('Failed to decrypt: ' + data.error);
+                    // Reset button states
+                    decryptBtn.innerHTML = '<i class="fas fa-unlock mr-1"></i>Decrypt';
+                    decryptBtn.disabled = false;
+                    button.innerHTML = '<i class="fas fa-unlock mr-1"></i>Decrypt';
+                    button.disabled = false;
+                    passwordInput.focus();
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+                // Reset button states
+                decryptBtn.innerHTML = '<i class="fas fa-unlock mr-1"></i>Decrypt';
+                decryptBtn.disabled = false;
+                button.innerHTML = '<i class="fas fa-unlock mr-1"></i>Decrypt';
+                button.disabled = false;
+                passwordInput.focus();
+            });
+        }
+        
+        decryptBtn.addEventListener('click', performDecrypt);
+        
+        // Handle enter key in password input
+        passwordInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                performDecrypt();
+            }
+        });
+    }
+</script>
+{% endblock %}
