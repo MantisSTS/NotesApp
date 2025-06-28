@@ -14,7 +14,10 @@ import os
 import getpass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
+from collections import defaultdict
+from time import time
+import re
 
 # Encryption imports
 from cryptography.fernet import Fernet
@@ -23,7 +26,26 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 # Web server imports
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_wtf.csrf import CSRFProtect
 import os
+
+
+def sanitize_input(input_str: str, max_length: int = 10000) -> str:
+    """Sanitize user input to prevent various injection attacks."""
+    if not input_str:
+        return ""
+    
+    # Limit length to prevent DoS
+    if len(input_str) > max_length:
+        input_str = input_str[:max_length]
+    
+    # Strip whitespace
+    input_str = input_str.strip()
+    
+    # Basic sanitization - remove null bytes and control characters
+    input_str = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', input_str)
+    
+    return input_str
 
 
 class NotesDatabase:
@@ -183,6 +205,39 @@ class NotesDatabase:
         conn.close()
         return tags
     
+    def get_tags_for_notes(self, note_ids: List[int]) -> Dict[int, List[str]]:
+        """Get tags for multiple notes efficiently."""
+        if not note_ids:
+            return {}
+        
+        # Validate that all note_ids are integers
+        if not all(isinstance(note_id, int) for note_id in note_ids):
+            raise ValueError("All note_ids must be integers")
+            
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Create placeholders for the IN clause
+        placeholders = ','.join(['?' for _ in note_ids])
+        
+        cursor.execute(f"""
+            SELECT nt.note_id, t.name
+            FROM note_tags nt
+            JOIN tags t ON nt.tag_id = t.id
+            WHERE nt.note_id IN ({placeholders})
+            ORDER BY t.name
+        """, note_ids)
+        
+        # Group tags by note_id
+        tags_dict = {}
+        for note_id, tag_name in cursor.fetchall():
+            if note_id not in tags_dict:
+                tags_dict[note_id] = []
+            tags_dict[note_id].append(tag_name)
+        
+        conn.close()
+        return tags_dict
+
     def get_all_tags(self) -> List[str]:
         """Get all tags in the database."""
         conn = sqlite3.connect(self.db_path)
@@ -438,15 +493,22 @@ class NotesDatabase:
         return self._decrypt_content(cmd, password, salt)
     
     def search_notes(self, query: str) -> List[Tuple]:
-        """Search notes by type, command content, or description (case-insensitive)."""
+        """Search notes by type, command content, description, or tags (case-insensitive)."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Make search case-insensitive using COLLATE NOCASE
-        cursor.execute(
-            "SELECT id, type, cmd, description, output, created_at, encrypted, salt FROM notes WHERE type LIKE ? COLLATE NOCASE OR cmd LIKE ? COLLATE NOCASE OR description LIKE ? COLLATE NOCASE ORDER BY created_at DESC",
-            (f"%{query}%", f"%{query}%", f"%{query}%")
-        )
+        # Search in notes table and tags table
+        cursor.execute("""
+            SELECT DISTINCT n.id, n.type, n.cmd, n.description, n.output, n.created_at, n.encrypted, n.salt
+            FROM notes n
+            LEFT JOIN note_tags nt ON n.id = nt.note_id
+            LEFT JOIN tags t ON nt.tag_id = t.id
+            WHERE n.type LIKE ? COLLATE NOCASE 
+               OR n.cmd LIKE ? COLLATE NOCASE 
+               OR n.description LIKE ? COLLATE NOCASE
+               OR t.name LIKE ? COLLATE NOCASE
+            ORDER BY n.created_at DESC
+        """, (f"%{query}%", f"%{query}%", f"%{query}%", f"%{query}%"))
         
         notes = cursor.fetchall()
         conn.close()
@@ -1066,10 +1128,60 @@ class NotesApp:
         response = input(f"Found {num_encrypted_notes} encrypted notes. Prompt for password to decrypt them? (y/N): ").lower()
         return response in ['y', 'yes']
 
+# Simple rate limiting storage
+rate_limit_store = defaultdict(list)
+
+def rate_limit_check(ip_address: str, max_requests: int = 100, window_minutes: int = 15) -> bool:
+    """Simple rate limiting check. Returns True if request is allowed."""
+    now = time()
+    window_start = now - (window_minutes * 60)
+    
+    # Clean old requests
+    rate_limit_store[ip_address] = [req_time for req_time in rate_limit_store[ip_address] if req_time > window_start]
+    
+    # Check if under limit
+    if len(rate_limit_store[ip_address]) < max_requests:
+        rate_limit_store[ip_address].append(now)
+        return True
+    
+    return False
+
 def create_web_app(notes_app: NotesApp) -> Flask:
     """Create and configure the Flask web application."""
     app = Flask(__name__)
     app.secret_key = os.urandom(24)
+    
+    # Enable CSRF protection
+    csrf = CSRFProtect(app)
+    
+    # Configure CSRF to accept tokens from various sources
+    app.config['WTF_CSRF_HEADERS'] = ['X-CSRFToken', 'X-CSRF-Token']
+    
+    # Security configurations
+    app.config['WTF_CSRF_TIME_LIMIT'] = None  # Don't expire CSRF tokens
+    
+    # Security headers
+    @app.after_request
+    def add_security_headers(response):
+        # Prevent XSS attacks
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        
+        # Content Security Policy
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
+            "font-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
+            "img-src 'self' data:; "
+            "connect-src 'self';"
+        )
+        
+        # Prevent MIME type sniffing
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        
+        return response
     
     # Add custom template filters
     @app.template_filter('filesizeformat')
@@ -1114,17 +1226,17 @@ def create_web_app(notes_app: NotesApp) -> Flask:
     def add_note():
         """Add a new note via web form."""
         if request.method == 'POST':
-            note_type = request.form.get('type', '').strip()
-            cmd = request.form.get('cmd', '').strip()
-            description = request.form.get('description', '').strip() or None
-            output = request.form.get('output', '').strip() or None
-            encrypt_password = request.form.get('encrypt_password', '').strip() or None
-            tags_input = request.form.get('tags', '').strip()
+            note_type = sanitize_input(request.form.get('type', ''), max_length=100)
+            cmd = sanitize_input(request.form.get('cmd', ''), max_length=50000)
+            description = sanitize_input(request.form.get('description', ''), max_length=1000) or None
+            output = sanitize_input(request.form.get('output', ''), max_length=50000) or None
+            encrypt_password = sanitize_input(request.form.get('encrypt_password', ''), max_length=200) or None
+            tags_input = sanitize_input(request.form.get('tags', ''), max_length=1000)
             
             # Parse tags (comma-separated)
             tags = []
             if tags_input:
-                tags = [tag.strip() for tag in tags_input.split(',') if tag.strip()]
+                tags = [sanitize_input(tag.strip(), max_length=50) for tag in tags_input.split(',') if tag.strip()]
             
             if not note_type or not cmd:
                 flash('Both type and command are required!', 'error')
@@ -1275,16 +1387,47 @@ def create_web_app(notes_app: NotesApp) -> Flask:
         return render_template('edit_note.html', note=note_dict, types=types, decrypted_cmd=decrypted_cmd, 
                              note_tags=note_tags, all_tags=all_tags, attachments=note_attachments)
     
+    @app.route('/view/<int:note_id>')
+    def view_note(note_id):
+        """View a specific note by ID."""
+        note = notes_app.db.get_note_by_id(note_id)
+        if not note:
+            flash('Note not found!', 'error')
+            return redirect(url_for('index'))
+        
+        # Convert tuple to dict for easier template access
+        note_dict = {
+            'id': note[0],
+            'type': note[1],
+            'cmd': note[2],
+            'description': note[3],
+            'output': note[4],
+            'created_at': note[5],
+            'encrypted': bool(note[6]),
+            'salt': note[7]
+        }
+        
+        # Get tags and attachments for this note
+        note_tags = notes_app.db.get_note_tags(note_id)
+        note_attachments = notes_app.db.get_note_attachments_with_encryption_info(note_id)
+        
+        return render_template('view_note.html', note=note_dict, note_tags=note_tags, attachments=note_attachments)
+
     @app.route('/search')
     def search():
-        """Search notes by type or command."""
-        query = request.args.get('q', '').strip()
+        """Search notes by type, command, description, or tags."""
+        query = sanitize_input(request.args.get('q', ''), max_length=500)
         notes = []
+        note_tags = {}
         
         if query:
             notes = notes_app.db.search_notes(query)
+            # Get tags for all notes in search results
+            if notes:
+                note_ids = [note[0] for note in notes]
+                note_tags = notes_app.db.get_tags_for_notes(note_ids)
         
-        return render_template('search.html', notes=notes, query=query)
+        return render_template('search.html', notes=notes, query=query, note_tags=note_tags)
     
     @app.route('/export')
     def export_search_results():
@@ -1370,17 +1513,25 @@ def create_web_app(notes_app: NotesApp) -> Flask:
     def decrypt_note(note_id):
         """Decrypt a note via web interface (AJAX endpoint)."""
         try:
-            # Get password from request
-            password = request.json.get('password', '').strip()
+            # Handle both JSON and form data requests
+            if request.is_json:
+                data = request.get_json()
+                password = data.get('password', '').strip() if data else ''
+            else:
+                password = request.form.get('password', '').strip()
+            
             if not password:
                 return jsonify({'success': False, 'error': 'Password is required'})
+            
+            # Input validation and sanitization
+            password = sanitize_input(password, max_length=1000)
             
             # Get and decrypt the note
             decrypted_content = notes_app.db.get_decrypted_note_content(note_id, password)
             if decrypted_content is None:
                 return jsonify({'success': False, 'error': 'Note not found or failed to decrypt. Check your password.'})
             
-            return jsonify({'success': True, 'content': decrypted_content})
+            return jsonify({'success': True, 'decrypted_content': decrypted_content})
                 
         except Exception as e:
             return jsonify({'success': False, 'error': f'Error decrypting note: {str(e)}'})
@@ -1514,6 +1665,15 @@ def create_web_app(notes_app: NotesApp) -> Flask:
                              note_type=note_type,
                              note_description=note_description)
     
+    @app.route('/get_csrf_token', methods=['GET'])
+    def get_csrf_token():
+        """Return a fresh CSRF token for AJAX requests."""
+        from flask_wtf.csrf import generate_csrf
+        try:
+            return jsonify({'csrf_token': generate_csrf()})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
     return app
 
 
@@ -1642,3 +1802,5 @@ Examples:
 
 if __name__ == '__main__':
     main()
+
+

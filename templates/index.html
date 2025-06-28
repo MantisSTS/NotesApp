@@ -43,6 +43,11 @@
                                     <span class="text-xs text-gray-500">
                                         {{ note.created_at }}
                                     </span>
+                                    <a href="{{ url_for('view_note', note_id=note.id) }}" 
+                                       class="text-blue-500 hover:text-blue-700 text-xs p-1 hover:bg-blue-50 rounded transition duration-200"
+                                       title="View this note">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
                                     <button 
                                         class="edit-note-btn text-blue-500 hover:text-blue-700 text-xs p-1 hover:bg-blue-50 rounded transition duration-200"
                                         onclick="window.location.href='/edit/{{ note.id }}'"
@@ -53,7 +58,7 @@
                                     <button 
                                         class="delete-note-btn text-red-500 hover:text-red-700 text-xs p-1 hover:bg-red-50 rounded transition duration-200"
                                         data-note-id="{{ note.id }}"
-                                        data-note-preview="{{ (note.cmd[:30] + '...') | e }}"
+                                        data-note-preview="{% if note.encrypted %}[ENCRYPTED CONTENT]{% else %}{{ (note.cmd[:30] + '...') | e }}{% endif %}"
                                         title="Delete this note"
                                     >
                                         <i class="fas fa-trash"></i>
@@ -221,6 +226,15 @@
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = `/delete/${noteId}`;
+                
+                // Add CSRF token
+                const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = csrfToken;
+                form.appendChild(csrfInput);
+                
                 document.body.appendChild(form);
                 form.submit();
             }
@@ -318,12 +332,17 @@
             button.disabled = true;
             
             // Send decrypt request
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
             fetch(`/decrypt/${noteId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
                 },
-                body: JSON.stringify({password: password})
+                body: JSON.stringify({
+                    password: password,
+                    csrf_token: csrfToken
+                })
             })
             .then(response => response.json())
             .then(data => {
@@ -331,7 +350,7 @@
                     // Show decrypted content
                     const contentDiv = document.querySelector(`.decrypted-content-${noteId}`);
                     const preElement = contentDiv.querySelector('pre');
-                    preElement.textContent = data.content;
+                    preElement.textContent = data.decrypted_content;
                     contentDiv.classList.remove('hidden');
                     
                     // Hide the decrypt button

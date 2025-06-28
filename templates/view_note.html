@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}View Note - Notes App{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-md p-6">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">
+            <i class="fas fa-eye mr-2 text-blue-600"></i>View Note
+            <span class="text-sm text-gray-500 font-normal ml-2">(ID: {{ note.id }})</span>
+        </h2>
+        <div class="flex space-x-2">
+            <a href="{{ url_for('edit_note', note_id=note.id) }}" 
+               class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200">
+                <i class="fas fa-edit mr-1"></i>Edit
+            </a>
+            <a href="{{ url_for('index') }}" 
+               class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200">
+                <i class="fas fa-arrow-left mr-1"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Note Details -->
+    <div class="space-y-4">
+        <!-- Tags -->
+        {% if note_tags %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-tags mr-1"></i>Tags
+                </label>
+                <div class="flex flex-wrap gap-2">
+                    {% for tag in note_tags %}
+                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                            {{ tag }}
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Type -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-tag mr-1"></i>Note Type
+            </label>
+            <span class="bg-gray-100 text-gray-800 px-3 py-2 rounded-md font-mono text-sm">{{ note.type }}</span>
+        </div>
+
+        <!-- Description -->
+        {% if note.description %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-info-circle mr-1"></i>Description
+                </label>
+                <p class="text-gray-700 bg-gray-50 p-3 rounded-md">{{ note.description }}</p>
+            </div>
+        {% endif %}
+
+        <!-- Command/Content -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-terminal mr-1"></i>Command/Content
+                {% if note.encrypted %}
+                    <span class="text-red-600 text-xs">
+                        <i class="fas fa-lock mr-1"></i>ENCRYPTED
+                    </span>
+                {% endif %}
+            </label>
+            
+            {% if note.encrypted %}
+                <div class="bg-red-50 border border-red-200 rounded-md p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center">
+                            <i class="fas fa-lock text-red-600 mr-2"></i>
+                            <span class="font-medium text-red-800">Encrypted Content</span>
+                        </div>
+                        <button 
+                            id="decryptBtn"
+                            onclick="showDecryptModal()"
+                            class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm font-medium transition duration-200"
+                        >
+                            <i class="fas fa-unlock mr-1"></i>Decrypt
+                        </button>
+                    </div>
+                    <p class="text-red-700 text-sm">
+                        This note's content is encrypted. Click "Decrypt" to enter your password and view the content.
+                    </p>
+                    
+                    <!-- Decrypted content will be shown here -->
+                    <div id="decryptedContent" class="hidden mt-4">
+                        <div class="bg-white border border-gray-300 p-3 rounded-md">
+                            <pre id="decryptedText" class="whitespace-pre-wrap font-mono text-sm text-gray-800"></pre>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="bg-gray-800 text-green-400 p-4 rounded-md font-mono text-sm overflow-x-auto">
+                    <pre class="whitespace-pre-wrap">{{ note.cmd }}</pre>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Output -->
+        {% if note.output %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-terminal mr-1"></i>Example Output
+                </label>
+                <div class="bg-gray-100 border border-gray-300 p-4 rounded-md">
+                    <pre class="whitespace-pre-wrap font-mono text-sm text-gray-700">{{ note.output }}</pre>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Attachments -->
+        {% if attachments %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-paperclip mr-1"></i>Attachments
+                </label>
+                <div class="space-y-2">
+                    {% for attachment in attachments %}
+                        <div class="flex items-center justify-between bg-gray-50 p-3 rounded-md border">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-file text-gray-500"></i>
+                                <div>
+                                    <span class="font-medium text-gray-800">{{ attachment.filename }}</span>
+                                    <span class="text-sm text-gray-500 ml-2">({{ attachment.filesize | filesizeformat }})</span>
+                                    {% if attachment.encrypted %}
+                                        <span class="text-red-600 text-xs ml-2">
+                                            <i class="fas fa-lock"></i> Encrypted
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <a href="{{ url_for('download_attachment', attachment_id=attachment.id) }}" 
+                               class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-medium transition duration-200">
+                                <i class="fas fa-download mr-1"></i>Download
+                            </a>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Metadata -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-clock mr-1"></i>Created
+            </label>
+            <span class="text-gray-600 text-sm">{{ note.created_at }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Decrypt Modal -->
+<div id="decryptModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">
+                <i class="fas fa-lock mr-2 text-red-600"></i>Decrypt Note
+            </h3>
+            <p class="text-sm text-gray-600 mb-4">
+                Enter the password to decrypt this note's content.
+            </p>
+            <form id="decryptForm">
+                <input 
+                    type="password" 
+                    id="decryptPassword" 
+                    placeholder="Enter decryption password"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
+                    required
+                >
+                <div class="flex justify-end space-x-3">
+                    <button 
+                        type="button" 
+                        onclick="hideDecryptModal()"
+                        class="px-4 py-2 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-md transition duration-200"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        type="submit"
+                        class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition duration-200"
+                    >
+                        <i class="fas fa-unlock mr-1"></i>Decrypt
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function showDecryptModal() {
+    document.getElementById('decryptModal').classList.remove('hidden');
+    document.getElementById('decryptPassword').focus();
+}
+
+function hideDecryptModal() {
+    document.getElementById('decryptModal').classList.add('hidden');
+    document.getElementById('decryptPassword').value = '';
+}
+
+document.getElementById('decryptForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const password = document.getElementById('decryptPassword').value;
+    if (!password) {
+        alert('Please enter a password');
+        return;
+    }
+    
+    // Send decrypt request
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    fetch(`/decrypt/{{ note.id }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': csrfToken,
+        },
+        body: JSON.stringify({ 
+            password: password,
+            csrf_token: csrfToken 
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('decryptedText').textContent = data.decrypted_content;
+            document.getElementById('decryptedContent').classList.remove('hidden');
+            document.getElementById('decryptBtn').innerHTML = '<i class="fas fa-check mr-1"></i>Decrypted';
+            document.getElementById('decryptBtn').classList.remove('bg-red-600', 'hover:bg-red-700');
+            document.getElementById('decryptBtn').classList.add('bg-green-600', 'hover:bg-green-700');
+            document.getElementById('decryptBtn').disabled = true;
+            hideDecryptModal();
+        } else {
+            alert('Failed to decrypt: ' + (data.error || 'Invalid password'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while decrypting the note');
+    });
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        hideDecryptModal();
+    }
+});
+
+// Close modal when clicking outside
+document.getElementById('decryptModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        hideDecryptModal();
+    }
+});
+</script>
+{% endblock %}

@@ -34,6 +34,12 @@ A secure, feature-rich notes application with both CLI and web interfaces, featu
    docker-compose up -d
    ```
 
+   **⚠️ First-time Setup:** If you have an existing `notes.db` file, migrate it first:
+   ```bash
+   ./migrate-db.sh  # Copy existing database to Docker volume
+   docker-compose up -d
+   ```
+
 3. **Set up CLI alias:**
    ```bash
    ./setup-cli.sh
@@ -288,7 +294,7 @@ python notes.py get --id 2 --prompt-decrypt
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
 
 ## 🆘 Support
 
