@@ -1536,7 +1536,7 @@ def create_web_app(notes_app: NotesApp) -> Flask:
         except Exception as e:
             return jsonify({'success': False, 'error': f'Error decrypting note: {str(e)}'})
 
-    @app.route('/attachment/<int:attachment_id>')
+    @app.route('/attachment/<int:attachment_id>', methods=['GET', 'POST'])
     def download_attachment(attachment_id):
         """Download a file attachment."""
         try:
@@ -1573,28 +1573,32 @@ def create_web_app(notes_app: NotesApp) -> Flask:
                 )
                 return response
             
-            # If encrypted, check for password parameter
-            password = request.args.get('password')
-            if not password:
-                # Redirect to a password prompt page
+            # If encrypted and GET request, redirect to password prompt
+            if request.method == 'GET':
                 flash('This attachment is encrypted. Password required for download.', 'warning')
                 return redirect(url_for('attachment_password_prompt', attachment_id=attachment_id))
             
-            # Try to decrypt with provided password
-            try:
-                decrypted_data = notes_app.db._decrypt_file_data(file_data, password, salt)
-                from flask import Response
-                response = Response(
-                    decrypted_data,
-                    mimetype=content_type or 'application/octet-stream',
-                    headers={
-                        'Content-Disposition': f'attachment; filename="{filename}"'
-                    }
-                )
-                return response
-            except ValueError as e:
-                flash(f'Failed to decrypt attachment: Wrong password', 'error')
-                return redirect(url_for('attachment_password_prompt', attachment_id=attachment_id))
+            # If encrypted and POST request, try to decrypt with provided password
+            if request.method == 'POST':
+                password = sanitize_input(request.form.get('password', ''), max_length=500)
+                if not password:
+                    flash('Password is required!', 'error')
+                    return redirect(url_for('attachment_password_prompt', attachment_id=attachment_id))
+                
+                try:
+                    decrypted_data = notes_app.db._decrypt_file_data(file_data, password, salt)
+                    from flask import Response
+                    response = Response(
+                        decrypted_data,
+                        mimetype=content_type or 'application/octet-stream',
+                        headers={
+                            'Content-Disposition': f'attachment; filename="{filename}"'
+                        }
+                    )
+                    return response
+                except ValueError as e:
+                    flash(f'Failed to decrypt attachment: Wrong password', 'error')
+                    return redirect(url_for('attachment_password_prompt', attachment_id=attachment_id))
             
         except Exception as e:
             flash(f'Error downloading attachment: {e}', 'error')
@@ -1650,14 +1654,8 @@ def create_web_app(notes_app: NotesApp) -> Flask:
             # Not encrypted, redirect directly to download
             return redirect(url_for('download_attachment', attachment_id=attachment_id))
         
-        if request.method == 'POST':
-            password = sanitize_input(request.form.get('password', ''), max_length=500)
-            if password:
-                # Redirect to download with password parameter
-                return redirect(url_for('download_attachment', attachment_id=attachment_id, password=password))
-            else:
-                flash('Password is required!', 'error')
-        
+        # This endpoint only displays the password form
+        # The form will POST directly to the download_attachment endpoint
         return render_template('attachment_password.html', 
                              attachment_id=attachment_id, 
                              filename=filename, 
