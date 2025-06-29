@@ -4,7 +4,7 @@ A secure, feature-rich notes application with both CLI and web interfaces, featu
 
 ![Notes App](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![Docker](https://img.shields.io/badge/Docker-Ready-brightgreen.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+![License](https://img.shields.io/badge/License-GPL--3.0-blue.svg)
 
 ## ✨ Features
 
@@ -85,9 +85,14 @@ notes add --type web --body 'npm start' --tags 'nodejs,development,frontend'
 # Get all notes of a specific type
 notes get docker
 
+# Get all notes relating to "payloads"
+notes get payloads
+
+
 # Filter by tags
 notes get --tags web,security
 notes get docker --tags production  # Intersection: docker notes with production tag
+notes get payloads --tags xss
 
 # Search across content
 notes get --search 'database'
@@ -294,7 +299,7 @@ python notes.py get --id 2 --prompt-decrypt
 
 ## 📄 License
 
-This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0) - see the [LICENSE](LICENSE) file for details.
 
 ## 🆘 Support
 
