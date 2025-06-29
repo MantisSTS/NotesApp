@@ -241,6 +241,42 @@ NotesApp/
 └── README.md           # This file
 ```
 
+## 👀 Screenshots
+
+### Basic Usage (CLI)
+
+![image](https://github.com/user-attachments/assets/7b29203a-c654-4098-97f7-c6f3e2b6af02)
+
+![image](https://github.com/user-attachments/assets/820c844d-f41b-4161-a5a8-dc674d5513f5)
+
+![image](https://github.com/user-attachments/assets/f930cd0b-ae07-496f-b8d6-c47d3b3ed165)
+
+![image](https://github.com/user-attachments/assets/07141f4c-6829-40eb-8093-b38167814938)
+
+![image](https://github.com/user-attachments/assets/863c9e73-1e31-44e7-938b-0f44cae4de90)
+
+### Basic Usage (Web UI)
+
+![image](https://github.com/user-attachments/assets/fac19dd3-5bbb-41fa-81bc-e4d4869e3656)
+
+![image](https://github.com/user-attachments/assets/f9c55e38-ffc0-42e9-81d6-5dff7baf824b)
+
+![image](https://github.com/user-attachments/assets/840acadd-ed83-4041-87f2-bf422aeb8dea)
+
+![image](https://github.com/user-attachments/assets/435400f3-ae82-467d-8edf-75c412190f30)
+
+![image](https://github.com/user-attachments/assets/cd774b38-63d0-4653-aba3-3e723e9c6562)
+
+![image](https://github.com/user-attachments/assets/fc663c8e-2625-4cb1-9ad8-214018891ca4)
+
+![image](https://github.com/user-attachments/assets/cba77252-85de-41b4-b65b-f726408357fa)
+
+![image](https://github.com/user-attachments/assets/56f49b36-8f82-41d5-a63a-279f3883b6cd)
+
+![image](https://github.com/user-attachments/assets/56d29b1d-0ea7-42b7-9e7c-9142cacc2cb9)
+
+![image](https://github.com/user-attachments/assets/8654c150-a0d9-48f4-8b81-53b12afec213)
+
 ## 🔧 Development
 
 ### Prerequisites
