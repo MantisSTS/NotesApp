@@ -759,7 +759,7 @@ class NotesApp:
     def __init__(self):
         self.db = NotesDatabase()
     
-    def add_note_cli(self, note_type: str, cmd: str, description: str = None, output: str = None, encrypt_password: str = None, json_output: bool = False, prompt_encrypt: bool = False):
+    def add_note_cli(self, note_type: str, cmd: str, description: str = None, output: str = None, encrypt_password: str = None, json_output: bool = False, prompt_encrypt: bool = False, tags: List[str] = None):
         """Add a note via CLI."""
         try:
             # Handle password prompting for encryption
@@ -772,7 +772,7 @@ class NotesApp:
                             print("Note not added - password required for encryption.", file=sys.stderr)
                         return
             
-            note_id = self.db.add_note(note_type, cmd, description, output, encrypt_password)
+            note_id = self.db.add_note(note_type, cmd, description, output, encrypt_password, tags)
             
             if json_output:
                 # Return JSON format
@@ -785,6 +785,7 @@ class NotesApp:
                         "description": description,
                         "output": output,
                         "encrypted": bool(encrypt_password),
+                        "tags": tags or [],
                         "created_at": datetime.now().isoformat()
                     }
                 }
@@ -800,6 +801,8 @@ class NotesApp:
                     print(f"Command: {cmd}")
                 if description:
                     print(f"Description: {description}")
+                if tags:
+                    print(f"Tags: {', '.join(tags)}")
                 if output:
                     print(f"Output: {output}")
         except Exception as e:
@@ -995,7 +998,7 @@ class NotesApp:
                 sys.exit(1)
             
             # Show note details
-            note_id, note_type, cmd, description, output, created_at = note
+            note_id, note_type, cmd, description, output, created_at, encrypted, salt = note
             print(f"Found note to delete:")
             print(f"  ID: {note_id}")
             print(f"  Type: {note_type}")
@@ -1707,6 +1710,7 @@ Examples:
     add_parser.add_argument('--output', help='Optional example output of the command')
     add_parser.add_argument('--encrypt', help='Encrypt the command content with this password')
     add_parser.add_argument('--prompt-encrypt', action='store_true', help='Prompt for encryption password interactively')
+    add_parser.add_argument('--tags', help='Tags for the note (comma-separated list, e.g., --tags web,security,nodejs)')
     add_parser.add_argument('--json', action='store_true', help='Output result in JSON format')
     
     # Get command
@@ -1760,7 +1764,12 @@ Examples:
         if args.prompt_encrypt and not encrypt_password:
             encrypt_password = notes_app._prompt_password("Enter encryption password: ", confirm=True)
         
-        notes_app.add_note_cli(args.type, args.body, args.description, args.output, encrypt_password, args.json)
+        # Parse tags if provided
+        tags = None
+        if args.tags:
+            tags = [tag.strip() for tag in args.tags.split(',') if tag.strip()]
+        
+        notes_app.add_note_cli(args.type, args.body, args.description, args.output, encrypt_password, args.json, tags=tags)
     
     elif args.command == 'get':
         # Handle both positional argument and --type flag (positional takes precedence)
